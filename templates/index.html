@@ -1,0 +1,83 @@
+{% load static %}
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arrachage des vignes - Valais</title>
+    <link rel="stylesheet" href="{% static 'style.css' %}" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+      body {
+        margin: 0;
+      }
+      #map {
+        height: 100vh;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+      // Initialiser la carte centrée sur le Valais
+      const map = L.map("map").setView([46.23, 7.36], 10);
+
+      // Fond de carte OpenStreetMap
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap",
+        maxZoom: 19,
+      }).addTo(map);
+
+      // Charger les parcelles depuis Django
+      fetch("/api/parcelles/")
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error("Failed to fetch parcelles: " + res.statusText);
+          }
+          return res.json();
+        })
+        .then((data) => {
+          console.log("Parcelles loaded:", data);
+          L.geoJSON(data, {
+            style: (feature) => ({
+              color: scoreToColor(feature.properties.score),
+              weight: 2,
+              opacity: 0.8,
+              fillOpacity: 0.6,
+            }),
+            pointToLayer: (feature, latlng) => {
+              return L.circleMarker(latlng, {
+                radius: 8,
+                fillColor: scoreToColor(feature.properties.score),
+                color: "#000",
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8,
+              });
+            },
+            onEachFeature: (feature, layer) => {
+              layer.bindPopup(`
+                <b>${feature.properties.nom}</b><br>
+                Score: ${(feature.properties.score * 100).toFixed(1)}%
+              `);
+            },
+          }).addTo(map);
+        })
+        .catch((error) => {
+          console.error("Error loading parcelles:", error);
+          alert("Erreur lors du chargement des parcelles: " + error.message);
+        });
+
+      // Colorer selon le score (rouge = prioritaire)
+      function scoreToColor(score) {
+        if (score > 0.75) return "#d73027"; // rouge
+        if (score > 0.5) return "#fc8d59"; // orange
+        if (score > 0.25) return "#fee08b"; // jaune
+        return "#1a9850"; // vert
+      }
+    </script>
+  </body>
+</html>

@@ -61,19 +61,206 @@
         box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
         z-index: 1000;
       }
+
+      /* Sidebar for AHP weights */
+      .ahp-sidebar {
+        position: fixed;
+        left: -350px;
+        top: 0;
+        width: 320px;
+        height: 100vh;
+        background: white;
+        box-shadow: 2px 0 15px rgba(0, 0, 0, 0.2);
+        overflow-y: auto;
+        transition: left 0.3s ease;
+        z-index: 999;
+      }
+      .ahp-sidebar.open {
+        left: 0;
+      }
+      .ahp-sidebar-header {
+        padding: 20px;
+        border-bottom: 2px solid #f0f0f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .ahp-sidebar-header h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: bold;
+      }
+      .ahp-close-btn {
+        background: none;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        color: #666;
+      }
+      .ahp-sidebar-content {
+        padding: 20px;
+      }
+      .weight-item {
+        margin-bottom: 20px;
+      }
+      .weight-label {
+        font-weight: bold;
+        font-size: 13px;
+        margin-bottom: 6px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .weight-value {
+        color: #0066cc;
+        font-weight: bold;
+      }
+      .weight-bar-container {
+        background-color: #f0f0f0;
+        height: 24px;
+        border-radius: 3px;
+        overflow: hidden;
+        border: 1px solid #ddd;
+      }
+      .weight-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #0066cc, #0099ff);
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-right: 6px;
+        color: white;
+        font-size: 11px;
+        font-weight: bold;
+        transition: width 0.3s ease;
+      }
+      .toggle-weights-btn {
+        position: fixed;
+        left: 10px;
+        top: 10px;
+        background: white;
+        border: 2px solid #333;
+        border-radius: 5px;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 14px;
+        z-index: 998;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        transition: background 0.2s;
+      }
+      .toggle-weights-btn:hover {
+        background: #f5f5f5;
+      }
+
+      /* Criterion score table in popup */
+      .criterion-scores {
+        background: #f9f9f9;
+        padding: 12px;
+        border-radius: 3px;
+        margin-top: 10px;
+      }
+      .criterion-scores-title {
+        font-weight: bold;
+        font-size: 12px;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        color: #333;
+      }
+      .criterion-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        font-size: 12px;
+        border-bottom: 1px solid #e0e0e0;
+      }
+      .criterion-row:last-child {
+        border-bottom: none;
+      }
+      .criterion-name {
+        color: #666;
+      }
+      .criterion-score {
+        font-weight: bold;
+        color: #0066cc;
+      }
     </style>
   </head>
   <body>
     <div id="map"></div>
+
+    <!-- AHP Weights Sidebar -->
+    <div id="ahp-sidebar" class="ahp-sidebar">
+      <div class="ahp-sidebar-header">
+        <h3>Poids AHP</h3>
+        <button class="ahp-close-btn" onclick="toggleWeightsSidebar()">
+          &times;
+        </button>
+      </div>
+      <div class="ahp-sidebar-content">
+        <div id="weights-container"></div>
+      </div>
+    </div>
+
+    <!-- Toggle Button for Sidebar -->
+    <button class="toggle-weights-btn" onclick="toggleWeightsSidebar()">
+      📊 Poids AHP
+    </button>
+
     <div id="loading" class="loading" style="display: none">
       <p>Chargement des parcelles...</p>
     </div>
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-      // Initialize map
+      // Global variables
       const map = L.map("map").setView([46.3, 7.8], 10);
       let parcellsLayer = null;
+      let ahpWeights = {};
+
+      // Toggle sidebar function
+      function toggleWeightsSidebar() {
+        const sidebar = document.getElementById("ahp-sidebar");
+        sidebar.classList.toggle("open");
+      }
+
+      // Display AHP weights in sidebar
+      function displayAHPWeights(weights) {
+        ahpWeights = weights;
+        const container = document.getElementById("weights-container");
+        container.innerHTML = "";
+
+        // Map French names for display
+        const labelMap = {
+          pente: "Pente (Slope)",
+          surface: "Surface (Area)",
+          distance_route: "Distance Route",
+          orientation: "Orientation",
+          altitude: "Altitude",
+          distance_urbain: "Distance Urbaine",
+        };
+
+        // Sort by weight descending
+        const sorted = Object.entries(weights).sort((a, b) => b[1] - a[1]);
+
+        sorted.forEach(([criterion, weight]) => {
+          const percentage = (weight * 100).toFixed(1);
+          const barWidth = weight * 100;
+
+          const html = `
+            <div class="weight-item">
+              <div class="weight-label">
+                <span>${labelMap[criterion] || criterion}</span>
+                <span class="weight-value">${percentage}%</span>
+              </div>
+              <div class="weight-bar-container">
+                <div class="weight-bar" style="width: ${barWidth}%;">
+                  ${barWidth > 15 ? percentage + "%" : ""}
+                </div>
+              </div>
+            </div>
+          `;
+          container.innerHTML += html;
+        });
+      }
 
       // Add OpenStreetMap tiles
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -107,9 +294,10 @@
           <hr style="margin: 10px 0; border: none; border-top: 1px solid #ccc;">
           <div style="font-size: 12px; margin-top: 10px; color: #666;">
             <strong>Méthode AHP:</strong><br>
-            Pente: 40%<br>
-            Distance route: 30%<br>
-            Surface: 30%
+            6 critères pondérés<br>
+            <a href="#" onclick="toggleWeightsSidebar(); return false;" style="color: #0066cc; text-decoration: underline;">
+              Voir les poids
+            </a>
           </div>
         `;
         return div;
@@ -145,6 +333,11 @@
             return;
           }
 
+          // Extract weights from first feature
+          if (data.features[0] && data.features[0].properties.ahp_weights) {
+            displayAHPWeights(data.features[0].properties.ahp_weights);
+          }
+
           // Create GeoJSON layer
           parcellsLayer = L.geoJSON(data, {
             style: (feature) => ({
@@ -176,8 +369,39 @@
               const distance =
                 props.distance_route || props.distance_r || "N/A";
 
+              // Build criterion scores table
+              const criterionScoresHTML = `
+                <div class="criterion-scores">
+                  <div class="criterion-scores-title">Scores des critères</div>
+                  <div class="criterion-row">
+                    <span class="criterion-name">Pente:</span>
+                    <span class="criterion-score">${(props.score_pente * 100).toFixed(0)}%</span>
+                  </div>
+                  <div class="criterion-row">
+                    <span class="criterion-name">Surface:</span>
+                    <span class="criterion-score">${(props.score_surface * 100).toFixed(0)}%</span>
+                  </div>
+                  <div class="criterion-row">
+                    <span class="criterion-name">Dist. Route:</span>
+                    <span class="criterion-score">${(props.score_distance_route * 100).toFixed(0)}%</span>
+                  </div>
+                  <div class="criterion-row">
+                    <span class="criterion-name">Orientation:</span>
+                    <span class="criterion-score">${(props.score_orientation * 100).toFixed(0)}%</span>
+                  </div>
+                  <div class="criterion-row">
+                    <span class="criterion-name">Altitude:</span>
+                    <span class="criterion-score">${(props.score_altitude * 100).toFixed(0)}%</span>
+                  </div>
+                  <div class="criterion-row">
+                    <span class="criterion-name">Dist. Urbaine:</span>
+                    <span class="criterion-score">${(props.score_distance_urbain * 100).toFixed(0)}%</span>
+                  </div>
+                </div>
+              `;
+
               const popupContent = `
-                <div style="width: 250px;">
+                <div style="width: 280px;">
                   <h4 style="margin: 0 0 10px 0;">Parcelle #${props.id || "N/A"}</h4>
                   <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
                     <tr>
@@ -192,6 +416,14 @@
                       <td style="padding: 5px; font-weight: bold;">Distance route:</td>
                       <td style="padding: 5px; text-align: right;">${distance} m</td>
                     </tr>
+                    <tr style="background-color: #f5f5f5;">
+                      <td style="padding: 5px; font-weight: bold;">Orientation:</td>
+                      <td style="padding: 5px; text-align: right;">${props.orientation || "N/A"}°</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 5px; font-weight: bold;">Altitude:</td>
+                      <td style="padding: 5px; text-align: right;">${props.altitude || "N/A"} m</td>
+                    </tr>
                     <tr style="background-color: #f5f5f5; font-weight: bold;">
                       <td style="padding: 5px;">Score AHP:</td>
                       <td style="padding: 5px; text-align: right; color: ${scoreToColor(props.ahp_score || 0.5)};">${score}%</td>
@@ -201,6 +433,7 @@
                       <td style="padding: 5px; text-align: right;">${priority}</td>
                     </tr>
                   </table>
+                  ${criterionScoresHTML}
                 </div>
               `;
 

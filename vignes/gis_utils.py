@@ -1,5 +1,6 @@
 """
 GIS utilities for processing vine cadastre data and calculating AHP scores.
+Implements 6-criteria Analytic Hierarchy Process with eigenvector method.
 """
 import os
 import json
@@ -15,16 +16,80 @@ _cache_timestamp = None
 
 class AHPScorer:
     """
-    Analytic Hierarchy Process (AHP) scorer for vine parcels.
-    Weights: slope 40%, distance to road 30%, area 30%
+    6-Criteria Analytic Hierarchy Process (AHP) scorer for vine parcels.
+    
+    Criteria:
+    - pente (slope): steeper = higher score
+    - surface: smaller parcel = higher score (INVERSE)
+    - distance_route: farther from road = higher score
+    - orientation: north-facing (180°) = higher, south-facing (0°/360°) = lower
+    - altitude: higher = higher score
+    - distance_urbain: closer to city = higher score (INVERSE)
     """
     
-    # AHP weights
-    WEIGHTS = {
-        'slope': 0.40,
-        'distance_road': 0.30,
-        'area': 0.30
-    }
+    # 6x6 Pairwise Comparison Matrix
+    # Edit these ratios to change relative importance of criteria
+    # A[i][j] = importance of criterion i relative to criterion j
+    PAIRWISE_MATRIX = np.array([
+        [1.0,  2.0,  3.0,  2.0,  2.0,  1.0],    # pente vs others
+        [0.5,  1.0,  0.5,  0.5,  0.5,  2.0],    # surface vs others
+        [0.33, 2.0,  1.0,  2.0,  2.0,  1.0],    # distance_route vs others
+        [0.5,  2.0,  0.5,  1.0,  0.5,  1.0],    # orientation vs others
+        [0.5,  2.0,  0.5,  2.0,  1.0,  1.0],    # altitude vs others
+        [1.0,  0.5,  1.0,  1.0,  1.0,  1.0]     # distance_urbain vs others
+    ], dtype=float)
+    
+    # Criterion names (order matches matrix rows/cols)
+    CRITERIA = ['pente', 'surface', 'distance_route', 'orientation', 'altitude', 'distance_urbain']
+    
+    # Track computed weights
+    WEIGHTS = None
+    CONSISTENCY_RATIO = None
+    
+    @classmethod
+    def compute_weights(cls):
+        """
+        Compute AHP weights using eigenvector method.
+        Returns dict of criterion -> weight and updates CONSISTENCY_RATIO.
+        Prints warning if CR > 0.10.
+        """
+        if cls.WEIGHTS is not None:
+            return cls.WEIGHTS  # Return cached weights
+        
+        # Normalize each column
+        col_sums = np.sum(cls.PAIRWISE_MATRIX, axis=0)
+        normalized = cls.PAIRWISE_MATRIX / col_sums
+        
+        # Calculate weights as row averages
+        weights = np.mean(normalized, axis=1)
+        
+        # Calculate consistency ratio
+        # 1. Calculate A * w (matrix-vector product)
+        aw = np.dot(cls.PAIRWISE_MATRIX, weights)
+        
+        # 2. Calculate λ_max (principal eigenvalue)
+        lambda_max = np.mean(aw / weights)
+        
+        # 3. Calculate consistency index
+        n = len(weights)
+        ci = (lambda_max - n) / (n - 1)
+        
+        # 4. Random Index for n=6
+        ri_values = {1: 0, 2: 0, 3: 0.58, 4: 0.90, 5: 1.12, 6: 1.24, 7: 1.32, 8: 1.41, 9: 1.45}
+        ri = ri_values.get(n, 1.24)
+        
+        # 5. Consistency ratio
+        cr = ci / ri if ri != 0 else 0
+        cls.CONSISTENCY_RATIO = cr
+        
+        if cr > 0.10:
+            print(f"⚠️ AHP Consistency Ratio ({cr:.3f}) exceeds 0.10 - matrix may need review")
+        else:
+            print(f"✓ AHP Consistency Ratio: {cr:.3f} (acceptable)")
+        
+        # Store weights as dict
+        cls.WEIGHTS = {cls.CRITERIA[i]: float(weights[i]) for i in range(n)}
+        return cls.WEIGHTS
     
     @staticmethod
     def normalize_value(value, min_val, max_val):
@@ -34,63 +99,97 @@ class AHPScorer:
         return (value - min_val) / (max_val - min_val)
     
     @staticmethod
-    def score_slope(slope, min_slope=0, max_slope=60):
-        """
-        Higher slope = higher priority (easier to uproot on steep terrain)
-        Normalized to [0, 1]
-        """
-        normalized = AHPScorer.normalize_value(slope, min_slope, max_slope)
+    def score_pente(pente, min_val=0, max_val=60):
+        """Slope: steeper = higher score. Normalized to [0, 1]."""
+        normalized = AHPScorer.normalize_value(pente, min_val, max_val)
         return np.clip(normalized, 0, 1)
     
     @staticmethod
-    def score_distance_road(distance_m, min_dist=0, max_dist=1000):
-        """
-        Farther from road = higher priority (more difficult to access)
-        Normalized to [0, 1] inverted
-        """
-        normalized = AHPScorer.normalize_value(distance_m, min_dist, max_dist)
-        return np.clip(1 - normalized, 0, 1)  # Invert: more distance = higher score
+    def score_surface(surface, min_val=100, max_val=50000):
+        """Surface: smaller = higher score (INVERSE). Normalized to [0, 1]."""
+        normalized = AHPScorer.normalize_value(surface, min_val, max_val)
+        return np.clip(1 - normalized, 0, 1)  # Invert
     
     @staticmethod
-    def score_area(area_m2, min_area=100, max_area=50000):
-        """
-        Larger area = higher priority (more efficient uprooting)
-        Normalized to [0, 1]
-        """
-        normalized = AHPScorer.normalize_value(area_m2, min_area, max_area)
+    def score_distance_route(distance_route, min_val=0, max_val=1000):
+        """Distance to road: farther = higher score. Normalized to [0, 1]."""
+        normalized = AHPScorer.normalize_value(distance_route, min_val, max_val)
         return np.clip(normalized, 0, 1)
+    
+    @staticmethod
+    def score_orientation(orientation, min_val=0, max_val=360):
+        """
+        Orientation: north-facing (180°) = higher, south-facing (0°/360°) = lower.
+        Normalized to [0, 1]. Computes distance to north (180°) as: 1 - |orientation - 180| / 180
+        """
+        # Normalize orientation to [0, 360)
+        orientation = orientation % 360
+        
+        # Distance from north (180°)
+        distance_from_north = min(abs(orientation - 180), 360 - abs(orientation - 180))
+        normalized = 1 - (distance_from_north / 180)
+        
+        return np.clip(normalized, 0, 1)
+    
+    @staticmethod
+    def score_altitude(altitude, min_val=300, max_val=2000):
+        """Altitude: higher = higher score. Normalized to [0, 1]."""
+        normalized = AHPScorer.normalize_value(altitude, min_val, max_val)
+        return np.clip(normalized, 0, 1)
+    
+    @staticmethod
+    def score_distance_urbain(distance_urbain, min_val=0, max_val=10000):
+        """Distance to city: closer = higher score (INVERSE). Normalized to [0, 1]."""
+        normalized = AHPScorer.normalize_value(distance_urbain, min_val, max_val)
+        return np.clip(1 - normalized, 0, 1)  # Invert
     
     @classmethod
     def calculate_score(cls, feature):
         """
-        Calculate AHP score for a feature.
+        Calculate 6-criteria AHP score for a feature.
         
-        Expects feature properties to have:
-        - pente (slope in degrees)
-        - distance_route or distance_r (distance to road in meters) 
-          Note: Shapefile truncates to 10 chars, so check both names
-        - surface (area in m²)
+        Returns dict with:
+        - ahp_score: weighted score [0, 1]
+        - individual_scores: dict of score_criterion for each criterion
+        - weights: dict of computed weights
+        
+        Note: Shapefile field names are truncated to 10 chars, so:
+        - distance_route -> distance_r
+        - distance_urbain -> distance_u
+        - orientation -> orientatio
         """
+        # Compute weights on first call
+        if cls.WEIGHTS is None:
+            cls.compute_weights()
+        
         props = feature.get('properties', {})
         
-        # Get values with defaults, handle both full and truncated field names
-        slope = float(props.get('pente', 0))
-        distance_road = float(props.get('distance_route') or props.get('distance_r', 0))
-        area = float(props.get('surface', 0))
+        # Extract values from properties (handle shapefile field name truncation)
+        pente = float(props.get('pente', 0))
+        surface = float(props.get('surface', 0))
+        distance_route = float(props.get('distance_route') or props.get('distance_r', 0))
+        orientation = float(props.get('orientation') or props.get('orientatio', 0))
+        altitude = float(props.get('altitude', 0))
+        distance_urbain = float(props.get('distance_urbain') or props.get('distance_u', 0))
         
-        # Calculate individual scores
-        score_s = cls.score_slope(slope)
-        score_d = cls.score_distance_road(distance_road)
-        score_a = cls.score_area(area)
+        # Calculate individual normalized scores [0, 1]
+        scores = {
+            'pente': cls.score_pente(pente),
+            'surface': cls.score_surface(surface),
+            'distance_route': cls.score_distance_route(distance_route),
+            'orientation': cls.score_orientation(orientation),
+            'altitude': cls.score_altitude(altitude),
+            'distance_urbain': cls.score_distance_urbain(distance_urbain)
+        }
         
         # Calculate weighted AHP score
-        ahp_score = (
-            cls.WEIGHTS['slope'] * score_s +
-            cls.WEIGHTS['distance_road'] * score_d +
-            cls.WEIGHTS['area'] * score_a
-        )
+        ahp_score = sum(cls.WEIGHTS[criterion] * scores[criterion] for criterion in cls.CRITERIA)
         
-        return np.clip(ahp_score, 0, 1)
+        return {
+            'ahp_score': np.clip(float(ahp_score), 0, 1),
+            'individual_scores': {f'score_{k}': float(v) for k, v in scores.items()},
+            'weights': cls.WEIGHTS
+        }
 
 
 class GISProcessor:
@@ -119,8 +218,8 @@ class GISProcessor:
     
     def generate_geojson_with_scores(self):
         """
-        Load shapefile, calculate AHP scores, and generate GeoJSON.
-        Returns GeoJSON FeatureCollection with scores.
+        Load shapefile, calculate 6-criteria AHP scores, and generate GeoJSON.
+        Returns GeoJSON FeatureCollection with individual scores and weights.
         """
         gdf = self.load_shapefile()
         
@@ -129,13 +228,21 @@ class GISProcessor:
         
         # Calculate and add AHP scores to each feature
         for feature in geojson['features']:
-            score = AHPScorer.calculate_score(feature)
-            feature['properties']['ahp_score'] = float(score)
+            result = AHPScorer.calculate_score(feature)
             
-            # Add readable score percentage
-            feature['properties']['score_percent'] = f"{score * 100:.1f}%"
+            # Main AHP score
+            feature['properties']['ahp_score'] = result['ahp_score']
+            feature['properties']['score_percent'] = f"{result['ahp_score'] * 100:.1f}%"
             
-            # Add priority level
+            # Individual criterion scores
+            for criterion, score_val in result['individual_scores'].items():
+                feature['properties'][criterion] = score_val
+            
+            # Weights (same for all features, but included for client-side use)
+            feature['properties']['ahp_weights'] = result['weights']
+            
+            # Priority level
+            score = result['ahp_score']
             if score > 0.75:
                 feature['properties']['priority'] = 'Haute'
             elif score > 0.50:

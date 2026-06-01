@@ -11,7 +11,8 @@ def index(request):
 
 def get_parcelles(request):
     """
-    Fetch parcelles from Shapefile and return as GeoJSON with AHP scores.
+    Fetch parcelles from Shapefile and return as GeoJSON with 6-criteria AHP scores.
+    Returns individual criterion scores and computed weights.
     Results are cached in memory for performance.
     """
     try:
@@ -36,41 +37,24 @@ def get_parcelles(request):
                             "priority": "Haute",
                             "surface": 1500,
                             "pente": 25,
-                            "distance_route": 150
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "geometry": {
-                            "type": "Point",
-                            "coordinates": [7.40, 46.25]
-                        },
-                        "properties": {
-                            "id": 2,
-                            "nom": "Parcelle Valais 2",
-                            "ahp_score": 0.85,
-                            "score_percent": "85.0%",
-                            "priority": "Haute",
-                            "surface": 2000,
-                            "pente": 30,
-                            "distance_route": 200
-                        }
-                    },
-                    {
-                        "type": "Feature",
-                        "geometry": {
-                            "type": "Point",
-                            "coordinates": [7.32, 46.20]
-                        },
-                        "properties": {
-                            "id": 3,
-                            "nom": "Parcelle Valais 3",
-                            "ahp_score": 0.45,
-                            "score_percent": "45.0%",
-                            "priority": "Moyenne",
-                            "surface": 1200,
-                            "pente": 15,
-                            "distance_route": 400
+                            "distance_route": 150,
+                            "orientation": 180,
+                            "altitude": 800,
+                            "distance_urbain": 5000,
+                            "score_pente": 0.42,
+                            "score_surface": 0.65,
+                            "score_distance_route": 0.15,
+                            "score_orientation": 0.95,
+                            "score_altitude": 0.35,
+                            "score_distance_urbain": 0.50,
+                            "ahp_weights": {
+                                "pente": 0.24,
+                                "surface": 0.15,
+                                "distance_route": 0.18,
+                                "orientation": 0.16,
+                                "altitude": 0.17,
+                                "distance_urbain": 0.10
+                            }
                         }
                     }
                 ]

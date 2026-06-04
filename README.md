@@ -1,4 +1,4 @@
-# Cadastre Viticole Valais — Aide à la décision d'arrachage
+# Vigne HES — Aide à la décision d'arrachage
 
 Application web GIS d'aide à la décision pour l'arrachage de vignes en Valais.  
 Visualise et classifie les parcelles viticoles selon une analyse multicritère AHP (6 critères).

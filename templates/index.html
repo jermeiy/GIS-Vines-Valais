@@ -1,0 +1,195 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vigne HES</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+</head>
+<body>
+
+<!-- ===== BARRE DU HAUT ===== -->
+<div id="top-bar">
+    <span class="app-title">Vigne HES</span>
+
+    <div class="top-region">
+        <label for="region-select">Région:</label>
+        <select id="region-select" onchange="onRegionChange()">
+            <!-- Options chargées dynamiquement par app.js -->
+        </select>
+    </div>
+
+    <div id="top-stats">
+        <span id="stat-total">–</span> parcelles chargées |
+        <span id="stat-visible">–</span> affichées
+    </div>
+</div>
+
+<!-- ===== LAYOUT PRINCIPAL ===== -->
+<div id="main">
+
+    <!-- === PANNEAU GAUCHE: Paramètres AHP === -->
+    <div id="left-panel">
+
+        <div class="panel-header">
+            <h3>Paramètres AHP</h3>
+            <button class="close-btn" onclick="togglePanel()" title="Fermer">✕</button>
+        </div>
+
+        <!-- Poids des critères -->
+        <div class="panel-section">
+            <h4>Importance des critères</h4>
+            <p class="hint">Glisser vers la droite pour augmenter l'importance d'un critère dans le score final.</p>
+
+            <div class="slider-group">
+                <div class="criterion-header">
+                    <span class="criterion-name">Pente</span>
+                    <span class="criterion-desc">Raide = difficile à mécaniser</span>
+                </div>
+                <input type="range" id="w-pente" min="0" max="4" step="1" value="4" oninput="onWeightChange()">
+                <div class="slider-ends">
+                    <span>Pas important</span>
+                    <span id="level-pente" class="level-badge">Critique</span>
+                    <span>Critique</span>
+                </div>
+            </div>
+
+            <div class="slider-group">
+                <div class="criterion-header">
+                    <span class="criterion-name">Surface</span>
+                    <span class="criterion-desc">Petite parcelle = moins rentable</span>
+                </div>
+                <input type="range" id="w-surface" min="0" max="4" step="1" value="1" oninput="onWeightChange()">
+                <div class="slider-ends">
+                    <span>Pas important</span>
+                    <span id="level-surface" class="level-badge">Faible</span>
+                    <span>Critique</span>
+                </div>
+            </div>
+
+            <div class="slider-group">
+                <div class="criterion-header">
+                    <span class="criterion-name">Distance route</span>
+                    <span class="criterion-desc">Loin de la route = accès difficile</span>
+                </div>
+                <input type="range" id="w-distance_route" min="0" max="4" step="1" value="3" oninput="onWeightChange()">
+                <div class="slider-ends">
+                    <span>Pas important</span>
+                    <span id="level-distance_route" class="level-badge">Important</span>
+                    <span>Critique</span>
+                </div>
+            </div>
+
+            <div class="slider-group">
+                <div class="criterion-header">
+                    <span class="criterion-name">Orientation</span>
+                    <span class="criterion-desc">Nord = moins de soleil = moins bonne qualité</span>
+                </div>
+                <input type="range" id="w-orientation" min="0" max="4" step="1" value="2" oninput="onWeightChange()">
+                <div class="slider-ends">
+                    <span>Pas important</span>
+                    <span id="level-orientation" class="level-badge">Moyen</span>
+                    <span>Critique</span>
+                </div>
+            </div>
+
+            <div class="slider-group">
+                <div class="criterion-header">
+                    <span class="criterion-name">Altitude</span>
+                    <span class="criterion-desc">Haut = conditions climatiques difficiles</span>
+                </div>
+                <input type="range" id="w-altitude" min="0" max="4" step="1" value="3" oninput="onWeightChange()">
+                <div class="slider-ends">
+                    <span>Pas important</span>
+                    <span id="level-altitude" class="level-badge">Important</span>
+                    <span>Critique</span>
+                </div>
+            </div>
+
+            <div class="slider-group">
+                <div class="criterion-header">
+                    <span class="criterion-name">Distance urbaine</span>
+                    <span class="criterion-desc">Proche d'une ville = pression foncière</span>
+                </div>
+                <input type="range" id="w-distance_urbain" min="0" max="4" step="1" value="2" oninput="onWeightChange()">
+                <div class="slider-ends">
+                    <span>Pas important</span>
+                    <span id="level-distance_urbain" class="level-badge">Moyen</span>
+                    <span>Critique</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Filtre score minimum -->
+        <div class="panel-section">
+            <h4>Filtre score minimum</h4>
+            <p class="hint">Les parcelles sous ce seuil apparaissent en transparence.</p>
+            <label>Afficher &gt; <span id="threshold-label" class="weight-val">0%</span></label>
+            <input type="range" id="score-threshold" min="0" max="100" value="0" oninput="onThresholdChange()">
+        </div>
+
+        <!-- Statistiques par priorité -->
+        <div class="panel-section">
+            <h4>Statistiques</h4>
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>Priorité</th>
+                        <th>Nb</th>
+                        <th>Surface</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="dot" style="background:#d73027"></span>Haute</td>
+                        <td id="stat-haute">–</td>
+                        <td id="area-haute">–</td>
+                    </tr>
+                    <tr>
+                        <td><span class="dot" style="background:#fc8d59"></span>Moyenne</td>
+                        <td id="stat-moyenne">–</td>
+                        <td id="area-moyenne">–</td>
+                    </tr>
+                    <tr>
+                        <td><span class="dot" style="background:#fee08b"></span>Basse</td>
+                        <td id="stat-basse">–</td>
+                        <td id="area-basse">–</td>
+                    </tr>
+                    <tr>
+                        <td><span class="dot" style="background:#1a9850"></span>Très Basse</td>
+                        <td id="stat-tres-basse">–</td>
+                        <td id="area-tres-basse">–</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+    <!-- fin #left-panel -->
+
+    <!-- === CARTE LEAFLET === -->
+    <div id="map"></div>
+
+</div>
+<!-- fin #main -->
+
+<!-- Bouton pour ré-ouvrir le panneau quand il est fermé -->
+<button id="open-panel-btn" style="display:none" onclick="togglePanel()" title="Ouvrir les paramètres">
+    Paramètres
+</button>
+
+<!-- Indicateur de chargement (overlay) -->
+<div id="loading">
+    <div class="loading-box">
+        <p>Chargement des parcelles...</p>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'app.js' %}"></script>
+
+</body>
+</html>

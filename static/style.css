@@ -1,0 +1,418 @@
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+
+/* ============================================================
+   BARRE DU HAUT
+   ============================================================ */
+#top-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 0 16px;
+    height: 50px;
+    background: #2c3e50;
+    color: white;
+    flex-shrink: 0;
+    z-index: 1000;
+}
+
+.app-title {
+    font-weight: bold;
+    font-size: 16px;
+    white-space: nowrap;
+}
+
+.top-region {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+#region-select {
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    background: white;
+}
+
+#top-stats {
+    margin-left: auto;
+    font-size: 13px;
+    color: #b0bec5;
+    white-space: nowrap;
+}
+
+#top-stats span {
+    color: white;
+    font-weight: bold;
+}
+
+
+/* ============================================================
+   LAYOUT PRINCIPAL (panneau + carte côte à côte)
+   ============================================================ */
+#main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+
+/* ============================================================
+   PANNEAU GAUCHE
+   ============================================================ */
+#left-panel {
+    width: 280px;
+    flex-shrink: 0;
+    background: white;
+    border-right: 1px solid #ddd;
+    overflow-y: auto;
+    transition: width 0.25s ease;
+    z-index: 500;
+}
+
+#left-panel.collapsed {
+    width: 0;
+    overflow: hidden;
+    border-right: none;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #ecf0f1;
+    border-bottom: 1px solid #ddd;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.panel-header h3 {
+    font-size: 14px;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    color: #7f8c8d;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.close-btn:hover {
+    background: #ddd;
+}
+
+.panel-section {
+    padding: 14px 16px;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.panel-section h4 {
+    font-size: 12px;
+    font-weight: bold;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
+}
+
+.hint {
+    font-size: 11px;
+    color: #aaa;
+    margin-bottom: 12px;
+    line-height: 1.4;
+}
+
+/* Sliders importance AHP */
+.slider-group {
+    margin-bottom: 18px;
+}
+
+/* Nom du critère + description */
+.criterion-header {
+    margin-bottom: 6px;
+}
+
+.criterion-name {
+    display: block;
+    font-size: 13px;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.criterion-desc {
+    display: block;
+    font-size: 11px;
+    color: #999;
+    margin-top: 1px;
+}
+
+/* Slider */
+.slider-group input[type=range] {
+    width: 100%;
+    cursor: pointer;
+    accent-color: #2980b9;
+    height: 6px;
+    margin: 4px 0;
+}
+
+/* Labels bas du slider: "Pas important" — badge — "Critique" */
+.slider-ends {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: #bbb;
+    margin-top: 2px;
+}
+
+/* Badge niveau actuel (Moyen, Important, Critique...) */
+.level-badge {
+    font-size: 11px;
+    font-weight: bold;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #aaa;
+    transition: background 0.2s;
+    white-space: nowrap;
+}
+
+/* Ratio de cohérence AHP */
+.cr-info {
+    font-size: 11px;
+    padding: 6px 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+    margin-top: 10px;
+    color: #555;
+}
+
+
+/* ============================================================
+   STATISTIQUES
+   ============================================================ */
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.stats-table th {
+    font-size: 11px;
+    color: #999;
+    text-align: left;
+    padding: 3px 6px;
+    font-weight: normal;
+    border-bottom: 1px solid #eee;
+}
+
+.stats-table td {
+    padding: 5px 6px;
+    border-bottom: 1px solid #f5f5f5;
+}
+
+.stats-table td:nth-child(2),
+.stats-table td:nth-child(3) {
+    text-align: right;
+    font-weight: bold;
+}
+
+.dot {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+
+/* ============================================================
+   BOUTON RÉ-OUVRIR PANNEAU
+   ============================================================ */
+#open-panel-btn {
+    position: fixed;
+    left: 10px;
+    top: 60px;
+    z-index: 1000;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 7px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+#open-panel-btn:hover {
+    background: #f5f5f5;
+}
+
+
+/* ============================================================
+   CARTE LEAFLET
+   ============================================================ */
+#map {
+    flex: 1;
+}
+
+
+/* ============================================================
+   INDICATEUR DE CHARGEMENT (overlay)
+   ============================================================ */
+#loading {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.loading-box {
+    background: white;
+    padding: 22px 42px;
+    border-radius: 8px;
+    font-size: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+
+
+/* ============================================================
+   LÉGENDE LEAFLET
+   ============================================================ */
+.legend {
+    background: white;
+    padding: 12px 14px;
+    border-radius: 5px;
+    font-size: 13px;
+    line-height: 1.6;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.legend h4 {
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #2c3e50;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.legend-item span {
+    width: 16px;
+    height: 16px;
+    display: inline-block;
+    border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.2);
+    flex-shrink: 0;
+}
+
+.legend hr {
+    border: none;
+    border-top: 1px solid #eee;
+    margin: 8px 0;
+}
+
+.legend-method {
+    font-size: 11px;
+    color: #999;
+}
+
+
+/* ============================================================
+   POPUP LEAFLET
+   ============================================================ */
+.popup-content {
+    min-width: 260px;
+    max-width: 320px;
+    font-size: 13px;
+}
+
+.popup-content h4 {
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: #2c3e50;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 6px;
+}
+
+.popup-content table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.popup-content td {
+    padding: 4px 6px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.popup-content td:first-child {
+    color: #666;
+}
+
+.popup-content td:last-child {
+    text-align: right;
+}
+
+.popup-content details {
+    margin-top: 10px;
+}
+
+.popup-content summary {
+    cursor: pointer;
+    font-size: 12px;
+    color: #2980b9;
+    margin-bottom: 6px;
+}
+
+.criteria-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+    font-size: 12px;
+}
+
+.criteria-table td {
+    padding: 3px 6px;
+    border-bottom: 1px solid #f5f5f5;
+    color: #555;
+}
+
+.criteria-table td:last-child {
+    text-align: right;
+    font-weight: bold;
+    color: #2980b9;
+}
